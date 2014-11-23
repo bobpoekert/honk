@@ -42,16 +42,20 @@
 
 (defn ^StreamClient get-stream
   [creds endpoint]
-  (let [^BlockingQueue outq (LinkedBlockingQueue. 1000)]
-    (StreamClient.
-      (->
-        (ClientBuilder.)
-        (.hosts Constants/STREAM_HOST)
-        (.endpoint endpoint)
-        (.authentication (make-creds creds))
-        (.processor (StringDelimitedProcessor. outq))
-        (.build))
-      outq)))
+  (let [rv (promise)
+        ^BlockingQueue outq (u/WeakrefQueue (LinkedBlockingQueue. 1000)
+                              (fn [q] (.close ^StreamClient @rv)))
+        res (StreamClient.
+              (->
+                (ClientBuilder.)
+                (.hosts Constants/STREAM_HOST)
+                (.endpoint endpoint)
+                (.authentication (make-creds creds))
+                (.processor (StringDelimitedProcessor. outq))
+                (.build))
+              outq)]
+    (deliver rv res)
+    res))
 
 (defn close-stream!
   [^StreamClient inp]
